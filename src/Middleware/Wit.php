@@ -12,6 +12,9 @@ use BotMan\BotMan\Messages\Incoming\IncomingMessage;
 class Wit implements MiddlewareInterface
 {
     /** @var string */
+    protected $apiUrl = 'https://api.wit.ai/message?v=20200727&q=';
+
+    /** @var string */
     protected $token;
 
     /** @var float */
@@ -49,7 +52,7 @@ class Wit implements MiddlewareInterface
 
     protected function getResponse(IncomingMessage $message)
     {
-        $endpoint = 'https://api.wit.ai/message?q=' . urlencode($message->getText());
+        $endpoint = $this->apiUrl . urlencode($message->getText());
 
         $this->response = $this->http->get($endpoint, [], [
             'Authorization: Bearer ' . $this->token,
@@ -87,6 +90,9 @@ class Wit implements MiddlewareInterface
 
         $responseData = Collection::make(json_decode($response->getContent(), true));
         $message->addExtras('entities', $responseData->get('entities'));
+        $message->addExtras('intents', $responseData->get('intents'));
+        $message->addExtras('traits', $responseData->get('traits'));
+        $message->addExtras('text', $responseData->get('text'));
 
         return $next($message);
     }
@@ -99,17 +105,13 @@ class Wit implements MiddlewareInterface
      */
     public function matching(IncomingMessage $message, $pattern, $regexMatched)
     {
-        $entities = Collection::make($message->getExtras())->get('entities', []);
+        $intents = Collection::make($message->getExtras())->get('intents', []);
 
-        if (!empty($entities)) {
-            foreach ($entities as $name => $entity) {
-                if ($name === 'intent') {
-                    foreach ($entity as $item) {
-                        if ($item['value'] === $pattern && $item['confidence'] >= $this->minimumConfidence) {
-                            return true;
-                        }
-                    }
-                }
+        if (!empty($intents)) {
+            foreach ($intents as $name => $intent) {
+                if ($intent['name'] === $pattern && $item['confidence'] >= $this->minimumConfidence) {
+                    return true;
+                }                
             }
         }
 
